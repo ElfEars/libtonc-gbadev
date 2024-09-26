@@ -6,20 +6,34 @@
 .SUFFIXES:
 #---------------------------------------------------------------------------------
 
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM)
-endif
-ifeq ($(strip $(DEVKITPRO)),)
-$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>devkitPro)
-endif
-include $(DEVKITARM)/gba_rules
+
+
+
+# Works fine as-is (May need to copy more flags) for most but chokes on the tte.
+#Seems to need "newlib"
+# https://github.com/Patater/newlib/blob/master/newlib/libc/include/sys/iosupport.h
+# C:\devkitPro\devkitARM\arm-none-eabi\include
+# vs
+# C:\Path\arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabi\lib\gcc\arm-none-eabi\13.3.1
+
+
+PREFIX	:=	arm-none-eabi-
+CC	:=	$(PREFIX)gcc
+CXX	:=	$(PREFIX)g++
+AS	:=	$(PREFIX)as
+AR	:=	$(PREFIX)gcc-ar
+OBJDUMP		:= $(PREFIX)objdump
+OBJCOPY	:=	$(PREFIX)objcopy
+STRIP	:=	$(PREFIX)strip
+NM	:=	$(PREFIX)gcc-nm
+RANLIB	:=	$(PREFIX)gcc-ranlib
+
+
 
 BUILD		:=	build
 SRCDIRS		:=	asm src src/font src/tte src/pre1.3
 INCDIRS		:=	include
 DATADIRS	:=	data
-
-DATESTRING	:=	$(shell date +%Y)$(shell date +%m)$(shell date +%d)
 
 ARCH		:=	-mthumb -mthumb-interwork
 RARCH		:= -mthumb-interwork -mthumb
@@ -30,11 +44,20 @@ bDEBUG2		:= 0	# Generate debug info (bDEBUG2? Not a full DEBUG flag. Yet)
 
 VERSION		:=	1.4.3
 
+# --- Define V as "1" for explicit output ---
+ifeq ($(V),1)
+	SILENTMSG := @true
+	SILENTCMD :=
+else
+	SILENTMSG := @echo
+	SILENTCMD := @
+endif
+
 #---------------------------------------------------------------------------------
 # Options for code generation
 #---------------------------------------------------------------------------------
 
-CBASE   := $(INCLUDE) -Wall -fno-strict-aliasing #-fno-tree-loop-optimize
+CBASE	:= $(INCLUDE) -Wall -fno-strict-aliasing #-fno-tree-loop-optimize
 CBASE	+= -O2
 
 RCFLAGS := $(CBASE) $(RARCH)
@@ -59,12 +82,6 @@ ifeq ($(strip $(bDEBUG2)), 1)
 endif
 
 #---------------------------------------------------------------------------------
-# Path to tools - this can be deleted if you set the path in windows
-#---------------------------------------------------------------------------------
-
-export PATH		:=	$(DEVKITARM)/bin:$(PATH)
-
-#---------------------------------------------------------------------------------
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
@@ -86,8 +103,8 @@ export DEPSDIR	:=	$(CURDIR)/build
 .PHONY: $(BUILD) clean docs
 
 $(BUILD):
-	@[ -d lib ] || mkdir -p lib
-	@[ -d $@ ] || mkdir -p $@
+	-@mkdir lib
+	-@mkdir $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 docs:
@@ -96,11 +113,6 @@ docs:
 clean:
 	@echo clean ...
 	@rm -fr $(BUILD)
-
-install:
-	@mkdir -p $(DESTDIR)$(DEVKITPRO)/libtonc/lib
-	@cp -rv include $(DESTDIR)$(DEVKITPRO)/libtonc/include
-	@cp -v lib/libtonc.a $(DESTDIR)$(DEVKITPRO)/libtonc/lib/
 
 #-------------------------------------------------------------------------------
 dist:
@@ -122,7 +134,7 @@ $(TARGET): $(OFILES)
 
 %.a : $(OFILES)
 	@echo Building $@
-	@rm -f $@
+#	@rm -f $@
 	@$(AR) -crs $@ $^
 	$(PREFIX)nm -Sn $@ > $(basename $(notdir $@)).map
 
@@ -133,6 +145,10 @@ $(TARGET): $(OFILES)
 %.o : %.c
 	@echo $(notdir $<)
 	$(CC) -MMD -MP -MF $(DEPSDIR)/$*.d $(RCFLAGS) -c $< -o $@
+
+%.o: %.s
+	@echo $(notdir $<)
+	$(CC) -MMD -MP -MF $(DEPSDIR)/$*.d -x assembler-with-cpp $(CXXFLAGS) $(ASFLAGS) -c $< -o $@ $(ERROR_FILTER)
 
 -include $(DEPENDS)
 

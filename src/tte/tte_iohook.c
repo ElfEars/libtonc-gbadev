@@ -7,6 +7,9 @@
 //
 // === NOTES ===
 
+/*! Disabled by default due to using newlib shenanigans */
+#ifdef TTE_IOHOOK
+
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -262,3 +265,4 @@ ssize_t tte_con_write(struct _reent *r, void *fd, const char *text, size_t len)
 
 
 // EOF
+#endif
